@@ -1,10 +1,13 @@
 -- Мобильный обозреватель плейса: дерево Workspace + подсветка и данные о коллизии
 -- выбранного объекта. Только официальный Roblox API, без executor-функций
--- (hookmetamethod, firetouchinterest и т.п.) — обычный LocalScript для своего плейса.
+-- (hookmetamethod, firetouchinterest и т.п.).
 --
--- Установка: StarterPlayer -> StarterPlayerScripts -> Insert Object -> LocalScript,
--- вставить содержимое файла. Впиши свой UserId в CONFIG.Admins, иначе панель
--- увидит только владелец плейса и ты в Studio.
+-- Запуск через executor (телефон и ПК одинаково):
+--   loadstring(game:HttpGet("https://raw.githubusercontent.com/hoykoS/Dex/main/Dex.lua"))()
+--
+-- Тот же файл можно вставить как обычный LocalScript в StarterPlayerScripts —
+-- тогда, если хочешь ограничить доступ другим игрокам своего плейса, впиши
+-- свои UserId в CONFIG.Admins (по умолчанию список пуст — панель открыта всем).
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -24,7 +27,15 @@ local function isAllowed()
 		return true
 	end
 
-	for _, id in CONFIG.Admins do
+	-- Список админов не задан (запуск через executor/loadstring как личный
+	-- инструмент) — панель открыта. Если вписал сюда свои UserId (сценарий
+	-- "вставил в свой плейс, другие игроки тоже получают этот скрипт") —
+	-- включается ограничение ниже.
+	if #CONFIG.Admins == 0 then
+		return true
+	end
+
+	for _, id in ipairs(CONFIG.Admins) do
 		if id == LocalPlayer.UserId then
 			return true
 		end
@@ -41,7 +52,7 @@ if not isAllowed() then
 	return
 end
 
-local ROW_HEIGHT = 32
+local ROW_HEIGHT = 40
 local INDENT = 18
 local HEADER_HEIGHT = 48
 local DIVIDER_HEIGHT = 1
@@ -222,7 +233,7 @@ local resizeHandle = Instance.new("TextButton")
 resizeHandle.Name = "Resize"
 resizeHandle.AnchorPoint = Vector2.new(1, 1)
 resizeHandle.Position = UDim2.new(1, -6, 1, -6)
-resizeHandle.Size = UDim2.fromOffset(30, 30)
+resizeHandle.Size = UDim2.fromOffset(38, 38)
 resizeHandle.BackgroundColor3 = THEME.PanelLight
 resizeHandle.AutoButtonColor = false
 resizeHandle.Text = "⤡"
