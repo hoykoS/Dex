@@ -156,6 +156,10 @@ windowHolder.ZIndex = 10
 windowHolder.Parent = gui
 corner(windowHolder, 16)
 
+local windowScale = Instance.new("UIScale")
+windowScale.Scale = 1
+windowScale.Parent = windowHolder
+
 local header = Instance.new("Frame")
 header.Name = "Header"
 header.Size = UDim2.new(1, 0, 0, HEADER_HEIGHT)
@@ -210,6 +214,62 @@ closeButton.ZIndex = 12
 closeButton.Parent = header
 
 makeDraggable(header, windowHolder)
+
+local MIN_SCALE = 0.7
+local MAX_SCALE = 1.6
+
+local resizeHandle = Instance.new("TextButton")
+resizeHandle.Name = "Resize"
+resizeHandle.AnchorPoint = Vector2.new(1, 1)
+resizeHandle.Position = UDim2.new(1, -6, 1, -6)
+resizeHandle.Size = UDim2.fromOffset(30, 30)
+resizeHandle.BackgroundColor3 = THEME.PanelLight
+resizeHandle.AutoButtonColor = false
+resizeHandle.Text = "⤡"
+resizeHandle.Font = Enum.Font.GothamBold
+resizeHandle.TextSize = 16
+resizeHandle.TextColor3 = THEME.TextDim
+resizeHandle.ZIndex = 15
+resizeHandle.Parent = windowHolder
+corner(resizeHandle, 8)
+
+local resizing = false
+local resizeStartScale = 1
+local resizeStartDistance = 1
+
+local function toVector2(position)
+	return Vector2.new(position.X, position.Y)
+end
+
+local function windowCenter()
+	return toVector2(windowHolder.AbsolutePosition) + windowHolder.AbsoluteSize / 2
+end
+
+resizeHandle.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		resizing = true
+		resizeStartScale = windowScale.Scale
+		resizeStartDistance = math.max((toVector2(input.Position) - windowCenter()).Magnitude, 1)
+	end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+	if not resizing then
+		return
+	end
+	if input.UserInputType ~= Enum.UserInputType.MouseMovement and input.UserInputType ~= Enum.UserInputType.Touch then
+		return
+	end
+
+	local distance = (toVector2(input.Position) - windowCenter()).Magnitude
+	windowScale.Scale = math.clamp(resizeStartScale * (distance / resizeStartDistance), MIN_SCALE, MAX_SCALE)
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		resizing = false
+	end
+end)
 
 local treeScroll = Instance.new("ScrollingFrame")
 treeScroll.Name = "Tree"
