@@ -2185,6 +2185,7 @@ local function runClient()
 	local espTab = addTab("ESP")
 	local teleportTab = addTab("Телепорт")
 	local playersTab = addTab("Игроки")
+	local explorerTab = addTab("Обозреватель")
 
 	sectionLabel(movementTab, "Перемещение", 1)
 
@@ -2545,6 +2546,209 @@ local function runClient()
 	Players.PlayerRemoving:Connect(function()
 		task.defer(rebuildPlayers)
 	end)
+
+	local EXPLORER_ROW_HEIGHT = 34
+	local EXPLORER_INDENT = 16
+
+	sectionLabel(explorerTab, "Workspace", 1)
+
+	local explorerCard = card(explorerTab, 2)
+
+	sectionLabel(explorerTab, "Свойства объекта", 3)
+
+	local explorerInfoCard = card(explorerTab, 4)
+
+	local explorerInfoLabel = label(explorerInfoCard, "Выбери объект в дереве выше", 13, FONT_MONO, THEME.TextFaint)
+	explorerInfoLabel.Size = UDim2.new(1, 0, 0, 0)
+	explorerInfoLabel.AutomaticSize = Enum.AutomaticSize.Y
+	explorerInfoLabel.TextWrapped = true
+
+	local explorerHighlight = Instance.new("Highlight")
+	explorerHighlight.Name = "DexExplorerHighlight"
+	explorerHighlight.FillColor = THEME.Accent
+	explorerHighlight.OutlineColor = THEME.Accent
+	explorerHighlight.FillTransparency = 0.65
+	explorerHighlight.OutlineTransparency = 0
+	explorerHighlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+	explorerHighlight.Enabled = false
+	explorerHighlight.Parent = workspace
+
+	local function formatBool(value)
+		return value and "да" or "нет"
+	end
+
+	local function describeExplorerInstance(instance)
+		local lines = {
+			"Имя: " .. instance.Name,
+			"Класс: " .. instance.ClassName,
+			"Путь: " .. instance:GetFullName(),
+		}
+
+		if instance:IsA("BasePart") then
+			table.insert(lines, "")
+			table.insert(lines, "CanCollide: " .. formatBool(instance.CanCollide))
+			table.insert(lines, "CanTouch: " .. formatBool(instance.CanTouch))
+			table.insert(lines, "CanQuery: " .. formatBool(instance.CanQuery))
+			table.insert(lines, "CollisionGroup: " .. instance.CollisionGroup)
+			table.insert(lines, "Size: " .. tostring(instance.Size))
+
+			local ok, fidelity = pcall(function()
+				return instance.CollisionFidelity
+			end)
+			if ok then
+				table.insert(lines, "CollisionFidelity: " .. tostring(fidelity))
+			end
+		elseif instance:IsA("Model") then
+			table.insert(lines, "")
+			local primary = instance.PrimaryPart
+			table.insert(lines, "PrimaryPart: " .. (primary and primary.Name or "не задан"))
+			if primary then
+				table.insert(lines, "CanCollide (PrimaryPart): " .. formatBool(primary.CanCollide))
+			end
+		else
+			table.insert(lines, "")
+			table.insert(lines, "У объекта нет физической коллизии")
+		end
+
+		return table.concat(lines, "\n")
+	end
+
+	local explorerSelectedRow = nil
+
+	local function explorerClearSelection()
+		if explorerSelectedRow then
+			TweenService:Create(explorerSelectedRow, TWEEN_FAST, { BackgroundTransparency = 1 }):Play()
+			explorerSelectedRow = nil
+		end
+		explorerHighlight.Enabled = false
+		explorerInfoLabel.Text = "Выбери объект в дереве выше"
+		explorerInfoLabel.TextColor3 = THEME.TextFaint
+	end
+
+	local function explorerSelect(instance, row)
+		if explorerSelectedRow then
+			TweenService:Create(explorerSelectedRow, TWEEN_FAST, { BackgroundTransparency = 1 }):Play()
+		end
+
+		explorerSelectedRow = row
+		row.BackgroundColor3 = THEME.AccentDeep
+		TweenService:Create(row, TWEEN_FAST, { BackgroundTransparency = 0.75 }):Play()
+
+		explorerHighlight.Adornee = instance
+		explorerHighlight.Enabled = true
+		explorerInfoLabel.Text = describeExplorerInstance(instance)
+		explorerInfoLabel.TextColor3 = THEME.Text
+	end
+
+	local createExplorerNode
+
+	function createExplorerNode(instance, parent, order)
+		local node = Instance.new("Frame")
+		node.Name = instance.Name
+		node.BackgroundTransparency = 1
+		node.Size = UDim2.new(1, 0, 0, 0)
+		node.AutomaticSize = Enum.AutomaticSize.Y
+		node.LayoutOrder = order
+		node.Parent = parent
+
+		local nodeLayout = Instance.new("UIListLayout")
+		nodeLayout.SortOrder = Enum.SortOrder.LayoutOrder
+		nodeLayout.Parent = node
+
+		local row = Instance.new("TextButton")
+		row.Size = UDim2.new(1, 0, 0, EXPLORER_ROW_HEIGHT)
+		row.BackgroundTransparency = 1
+		row.AutoButtonColor = false
+		row.Text = ""
+		row.LayoutOrder = 1
+		row.Parent = node
+		corner(row, UDim.new(0, 8))
+
+		local hasChildren = #instance:GetChildren() > 0
+
+		local arrow = Instance.new("TextButton")
+		arrow.Size = UDim2.fromOffset(EXPLORER_ROW_HEIGHT, EXPLORER_ROW_HEIGHT)
+		arrow.BackgroundTransparency = 1
+		arrow.AutoButtonColor = false
+		arrow.Font = FONT_DISPLAY
+		arrow.TextSize = 12
+		arrow.TextColor3 = THEME.TextFaint
+		arrow.Text = hasChildren and "▶" or "•"
+		arrow.Parent = row
+
+		local nameLabel = label(
+			row,
+			string.format('%s  <font color="rgb(118,133,158)">%s</font>', instance.Name, instance.ClassName),
+			13,
+			FONT_BODY,
+			THEME.Text
+		)
+		nameLabel.Size = UDim2.new(1, -EXPLORER_ROW_HEIGHT, 1, 0)
+		nameLabel.Position = UDim2.fromOffset(EXPLORER_ROW_HEIGHT, 0)
+		nameLabel.TextTruncate = Enum.TextTruncate.AtEnd
+
+		local childrenFrame = Instance.new("Frame")
+		childrenFrame.Name = "Children"
+		childrenFrame.BackgroundTransparency = 1
+		childrenFrame.Size = UDim2.new(1, 0, 0, 0)
+		childrenFrame.AutomaticSize = Enum.AutomaticSize.Y
+		childrenFrame.Visible = false
+		childrenFrame.LayoutOrder = 2
+		childrenFrame.Parent = node
+
+		padding(childrenFrame, 0, 0, 0, EXPLORER_INDENT)
+
+		local childLayout = Instance.new("UIListLayout")
+		childLayout.SortOrder = Enum.SortOrder.LayoutOrder
+		childLayout.Parent = childrenFrame
+
+		local expanded = false
+		local built = false
+
+		local function toggleExpand()
+			if not hasChildren then
+				return
+			end
+
+			expanded = not expanded
+			childrenFrame.Visible = expanded
+			arrow.Text = expanded and "▼" or "▶"
+
+			if expanded and not built then
+				built = true
+				local children = instance:GetChildren()
+				table.sort(children, function(a, b)
+					return a.Name:lower() < b.Name:lower()
+				end)
+				for index, child in children do
+					createExplorerNode(child, childrenFrame, index)
+				end
+			end
+		end
+
+		arrow.Activated:Connect(toggleExpand)
+		row.Activated:Connect(function()
+			explorerSelect(instance, row)
+		end)
+
+		return node, toggleExpand
+	end
+
+	local explorerRootNode, explorerRootToggle = createExplorerNode(workspace, explorerCard, 1)
+	explorerRootToggle()
+
+	buttonRow(explorerTab, {
+		title = "Пересобрать дерево",
+		subtitle = "Обновит список, если объекты в мире изменились",
+		order = 5,
+		onClick = function()
+			explorerClearSelection()
+			explorerRootNode:Destroy()
+			explorerRootNode, explorerRootToggle = createExplorerNode(workspace, explorerCard, 1)
+			explorerRootToggle()
+			setStatus("Дерево пересобрано")
+		end,
+	})
 
 	setStatus("Панель готова")
 end
