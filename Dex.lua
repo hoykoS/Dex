@@ -1,6 +1,6 @@
 local SCRIPT_SLUG = "dex"
 local SCRIPT_TITLE = "Dex"
-local VALIDATE_URL = "https://elohub-tg-bot.onrender.com/validate"
+local VALIDATE_URL = "https://elohub-tg.onrender.com/validate"
 local KEY_FILE = "elohub_" .. SCRIPT_SLUG .. "_key.txt"
 
 local HttpService = game:GetService("HttpService")
